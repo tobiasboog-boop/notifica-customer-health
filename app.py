@@ -561,7 +561,7 @@ def main():
         "🔍 Klant Detail",
         "📧 Contactpersonen",
         "📑 Rapport Mapping",
-        "📨 Upsell Emails",
+        "📨 Email Templates",
         "🤖 AI Assistent"
     ])
 
@@ -1055,15 +1055,18 @@ def main():
             report_usage.to_excel(buffer, index=False)
             st.download_button("Download mapping als Excel", buffer.getvalue(), "rapport_mapping.xlsx")
 
-    # === TAB 6: UPSELL EMAILS ===
+    # === TAB 6: EMAIL TEMPLATES ===
     with tab6:
-        st.header("📨 Upsell Emails")
+        st.header("📨 Email Templates")
         st.markdown("""
-        Identificeer klanten die bepaalde rapportclusters nog niet gebruiken en genereer
-        een email om ze te overtuigen deze functionaliteit wel te gaan gebruiken.
+        Selecteer een template, kies je doelgroep, en genereer een kant-en-klare email.
+        Alle templates zijn informeel en to-the-point.
         """)
 
-        # S&O clusters - sommige klanten hebben geen S&O
+        # Import voor URL encoding
+        import urllib.parse
+
+        # S&O clusters
         SO_CLUSTERS = [
             'Bewaking rendement S&O',
             'Onderhoudsplanning',
@@ -1071,215 +1074,354 @@ def main():
             'S&O Uitvoering'
         ]
 
-        # Standaard clusters - alle klanten zouden deze moeten gebruiken
-        STANDAARD_CLUSTERS = [
-            'Financieel Overzicht',
-            'Projectwaardering',
-            'Bewaking productiviteit',
-            'Projectbewaking',
-            'Offerte en Sales proces',
-            'Resource Management',
-            'Liquiditeitsoverzicht',
-            'Werkkapitaal (debiteuren, voorraad)',
-            'Directierapport'
-        ]
+        # Cluster beschrijvingen
+        CLUSTER_BESCHRIJVINGEN = {
+            'Financieel Overzicht': 'direct inzicht in je financiële positie, van resultatenrekening tot begroting',
+            'Projectwaardering': 'nauwkeurige waardering van je projecten met nacalculatie en rendementsanalyse',
+            'Bewaking productiviteit': 'grip op productiviteit, urenregistratie en personele bezetting',
+            'Projectbewaking': 'volledige controle over projectvoortgang, onderhanden werk en meerwerk',
+            'Offerte en Sales proces': 'inzicht in je sales pipeline, offertes en orderintake',
+            'Resource Management': 'optimale inzet van je resources met capaciteitsplanning',
+            'Liquiditeitsoverzicht': 'actueel zicht op je liquiditeitspositie en cashflow forecast',
+            'Werkkapitaal (debiteuren, voorraad)': 'beheer van debiteuren, crediteuren en voorraden',
+            'Bewaking rendement S&O': 'analyse van service & onderhoud rendement',
+            'Onderhoudsplanning': 'planning en bewaking van onderhoudswerkzaamheden',
+            'Openstaande Werkbonnen': 'overzicht van openstaande werkorders en tickets',
+            'S&O Uitvoering': 'monitoring van service uitvoering en storingen',
+            'Directierapport': 'compact overzicht voor directie met alle belangrijke KPIs'
+        }
 
         # Analyseer per klant welke clusters ze gebruiken
         klant_cluster_usage = {}
-
         for klant in scores_df['Klant_Code'].unique():
             klant_rapporten = pbi_df[pbi_df['Klant_Code'] == klant]['Report name'].unique()
             gebruikte_clusters = set()
-
             for rapport in klant_rapporten:
                 cluster = categorize_report(rapport)
                 if cluster != 'Niet geclassificeerd':
                     gebruikte_clusters.add(cluster)
-
             klant_cluster_usage[klant] = gebruikte_clusters
 
-        # Filter opties
-        st.subheader("🎯 Selecteer doelgroep")
+        # Helper functie voor email weergave en verzending
+        def render_email(to_emails, subject, body, template_name):
+            to_line = '; '.join(list(set(to_emails))[:10]) if to_emails else ''
 
-        col1, col2 = st.columns(2)
-        with col1:
-            include_so = st.checkbox("Inclusief S&O clusters", value=False,
-                help="Vink aan als je ook S&O clusters wilt meenemen (niet alle klanten hebben S&O)")
-        with col2:
-            min_missing = st.slider("Minimum aantal ontbrekende clusters", 1, 5, 2)
+            email_display = f"""**Aan:** {to_line if to_line else '[geen emails gevonden]'}
 
-        # Bepaal welke clusters te checken
-        clusters_to_check = STANDAARD_CLUSTERS.copy()
-        if include_so:
-            clusters_to_check.extend(SO_CLUSTERS)
+**Onderwerp:** {subject}
 
-        # Selecteer specifieke cluster om op te focussen
-        selected_cluster = st.selectbox(
-            "Focus op specifieke rapportcluster (optioneel)",
-            options=['Alle clusters'] + clusters_to_check
+---
+
+{body}
+"""
+            st.text_area("Email template", email_display, height=350, key=f"email_{template_name}")
+
+            encoded_body = urllib.parse.quote(body)
+            encoded_subject = urllib.parse.quote(subject)
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if to_line:
+                    mailto_url = f"mailto:{to_line}?subject={encoded_subject}&body={encoded_body}"
+                    st.markdown(f'''
+                    <a href="{mailto_url}" target="_blank" style="
+                        display: inline-block;
+                        padding: 10px 20px;
+                        background-color: #0066cc;
+                        color: white;
+                        text-decoration: none;
+                        border-radius: 5px;
+                        font-weight: bold;
+                    ">📧 Open in Outlook</a>
+                    ''', unsafe_allow_html=True)
+                else:
+                    st.warning("Geen email adressen gevonden. Upload Pipedrive People data.")
+            with col2:
+                st.download_button(
+                    "📋 Download als tekstbestand",
+                    email_display,
+                    file_name=f"email_{template_name.replace(' ', '_')}.txt",
+                    mime="text/plain",
+                    key=f"download_{template_name}"
+                )
+
+        # Helper functie om emails op te halen
+        def get_emails_for_klanten(klant_namen_list):
+            to_emails = []
+            if contacts_df is not None and len(contacts_df) > 0:
+                for klant_naam in klant_namen_list:
+                    klant_contacts = get_contacts_for_customer(contacts_df, klant_naam)
+                    if len(klant_contacts) > 0:
+                        for _, contact in klant_contacts.iterrows():
+                            email = contact.get('Email')
+                            if pd.notna(email):
+                                emails = str(email).split(',')
+                                to_emails.extend([e.strip() for e in emails if '@' in e])
+            return to_emails
+
+        # Template selectie
+        st.subheader("📋 Kies een template")
+
+        template_options = {
+            "🔴 ROOD - Reactivatie": "Voor klanten die nauwelijks gebruik maken van de dashboards",
+            "🟠 ORANJE - Stimulans": "Voor klanten die het oké doen maar beter kunnen",
+            "📊 Cluster Introductie": "Promoot een specifieke rapportcluster die de klant nog niet gebruikt",
+            "👥 Meer gebruikers": "Nodig klanten uit om meer collega's toegang te geven",
+            "🎓 Training aanbod": "Voor klanten met veel clusters maar weinig views"
+        }
+
+        selected_template = st.selectbox(
+            "Selecteer template",
+            options=list(template_options.keys()),
+            format_func=lambda x: f"{x} - {template_options[x]}"
         )
 
-        # Vind klanten met ontbrekende clusters
-        missing_data = []
-        for klant, gebruikte in klant_cluster_usage.items():
-            if selected_cluster == 'Alle clusters':
-                ontbrekend = [c for c in clusters_to_check if c not in gebruikte]
-            else:
-                ontbrekend = [selected_cluster] if selected_cluster not in gebruikte else []
+        st.markdown("---")
 
-            if len(ontbrekend) >= min_missing or (selected_cluster != 'Alle clusters' and ontbrekend):
-                # Haal klantnaam op
-                klant_info = klantnamen[klantnamen['Klant_Code'] == klant]
-                klant_naam = klant_info['Klantnaam'].iloc[0] if len(klant_info) > 0 else klant
+        # === TEMPLATE 1: ROOD - REACTIVATIE ===
+        if selected_template == "🔴 ROOD - Reactivatie":
+            st.subheader("🔴 Reactivatie - Rode klanten")
+            st.markdown("Klanten die nauwelijks gebruik maken van de dashboards en aandacht nodig hebben.")
 
-                missing_data.append({
-                    'Klant_Code': klant,
-                    'Klantnaam': klant_naam,
-                    'Aantal ontbrekend': len(ontbrekend),
-                    'Ontbrekende clusters': ', '.join(ontbrekend),
-                    'Wel in gebruik': ', '.join(sorted(gebruikte))
-                })
+            rood_klanten = scores_df[scores_df['Kleur'] == 'ROOD'][['Klant_Code', 'Klantnaam', 'Functionarissen', 'Views']].copy()
 
-        missing_df = pd.DataFrame(missing_data)
+            if len(rood_klanten) > 0:
+                st.dataframe(rood_klanten, use_container_width=True, height=200)
 
-        if len(missing_df) > 0:
-            st.subheader(f"📋 Klanten met ontbrekende clusters ({len(missing_df)} klanten)")
-            missing_df = missing_df.sort_values('Aantal ontbrekend', ascending=False)
-            st.dataframe(missing_df, use_container_width=True, height=300)
+                selected_klanten = st.multiselect(
+                    "Selecteer klanten",
+                    options=rood_klanten['Klantnaam'].tolist(),
+                    default=[],
+                    key="rood_select"
+                )
 
-            # Email generatie sectie
-            st.subheader("✉️ Email Genereren")
+                if selected_klanten:
+                    to_emails = get_emails_for_klanten(selected_klanten)
 
-            # Selecteer klanten voor email
-            selected_klanten = st.multiselect(
-                "Selecteer klanten voor email",
-                options=missing_df['Klantnaam'].tolist(),
-                default=[]
-            )
+                    subject = "Even checken - hoe gaat het met jullie dashboards?"
+                    body = """Hoi,
 
-            if selected_klanten:
-                # Haal ontbrekende clusters op voor geselecteerde klanten
-                ontbrekend_per_klant = {}
-                for klant_naam in selected_klanten:
-                    row = missing_df[missing_df['Klantnaam'] == klant_naam].iloc[0]
-                    ontbrekend_per_klant[klant_naam] = row['Ontbrekende clusters'].split(', ')
+We merkten dat jullie Power BI dashboards de laatste tijd weinig bekeken worden. Dat vinden we jammer, want er zit veel waarde in die we graag met jullie benutten.
 
-                # Bepaal gemeenschappelijke ontbrekende clusters
-                all_missing = set()
-                for clusters in ontbrekend_per_klant.values():
-                    all_missing.update(clusters)
+Misschien herken je een van deze situaties:
+- De dashboards sluiten niet goed aan bij jullie werkwijze
+- Er zijn vragen over hoe je bepaalde inzichten kunt vinden
+- De juiste mensen hebben nog geen toegang
 
-                st.markdown(f"**Ontbrekende clusters bij geselecteerde klanten:** {', '.join(all_missing)}")
-
-                # Email template
-                email_cluster = st.selectbox(
-                    "Selecteer cluster voor email focus",
-                    options=list(all_missing)
-                ) if all_missing else None
-
-                if email_cluster:
-                    # Cluster beschrijvingen voor email (informele toon met jij/je)
-                    CLUSTER_BESCHRIJVINGEN = {
-                        'Financieel Overzicht': 'direct inzicht in je financiële positie, van resultatenrekening tot begroting',
-                        'Projectwaardering': 'nauwkeurige waardering van je projecten met nacalculatie en rendementsanalyse',
-                        'Bewaking productiviteit': 'grip op productiviteit, urenregistratie en personele bezetting',
-                        'Projectbewaking': 'volledige controle over projectvoortgang, onderhanden werk en meerwerk',
-                        'Offerte en Sales proces': 'inzicht in je sales pipeline, offertes en orderintake',
-                        'Resource Management': 'optimale inzet van je resources met capaciteitsplanning',
-                        'Liquiditeitsoverzicht': 'actueel zicht op je liquiditeitspositie en cashflow forecast',
-                        'Werkkapitaal (debiteuren, voorraad)': 'beheer van debiteuren, crediteuren en voorraden',
-                        'Bewaking rendement S&O': 'analyse van service & onderhoud rendement',
-                        'Onderhoudsplanning': 'planning en bewaking van onderhoudswerkzaamheden',
-                        'Openstaande Werkbonnen': 'overzicht van openstaande werkorders en tickets',
-                        'S&O Uitvoering': 'monitoring van service uitvoering en storingen',
-                        'Directierapport': 'compact overzicht voor directie met alle belangrijke KPIs'
-                    }
-
-                    beschrijving = CLUSTER_BESCHRIJVINGEN.get(email_cluster, 'waardevolle inzichten voor je organisatie')
-
-                    # Genereer email
-                    st.markdown("---")
-                    st.markdown("### 📧 Gegenereerde Email")
-
-                    # Bouw to: lijst via get_contacts_for_customer functie
-                    to_emails = []
-                    if contacts_df is not None and len(contacts_df) > 0:
-                        for klant_naam in selected_klanten:
-                            klant_contacts = get_contacts_for_customer(contacts_df, klant_naam)
-                            if len(klant_contacts) > 0:
-                                for _, contact in klant_contacts.iterrows():
-                                    email = contact.get('Email')
-                                    if pd.notna(email):
-                                        emails = str(email).split(',')
-                                        to_emails.extend([e.strip() for e in emails if '@' in e])
-
-                    to_line = '; '.join(list(set(to_emails))[:10]) if to_emails else ''
-
-                    # Email body (informele toon)
-                    email_subject = f"Haal meer uit je Power BI dashboards - {email_cluster}"
-                    email_body = f"""Hoi,
-
-We zagen dat jullie nog geen gebruik maken van onze {email_cluster} dashboards.
-
-Dit cluster biedt je {beschrijving}.
-
-Wat kun je verwachten?
-- Direct inzicht zonder handmatige rapportages
-- Altijd actuele data vanuit je bronsysteem
-- Speciaal ontworpen voor jullie branche
-
-Wil je meer weten over de mogelijkheden? We plannen graag een korte demo in om te laten zien hoe dit dashboard jullie kan helpen.
+We denken graag met je mee. Zullen we even bellen om te kijken hoe we de dashboards beter kunnen laten werken voor jullie?
 
 Groet,
 
 Het Notifica Team"""
 
-                    # Display template
-                    email_display = f"""**Aan:** {to_line if to_line else '[geen emails gevonden]'}
+                    render_email(to_emails, subject, body, "rood_reactivatie")
+            else:
+                st.success("Geen rode klanten gevonden!")
 
-**Onderwerp:** {email_subject}
+        # === TEMPLATE 2: ORANJE - STIMULANS ===
+        elif selected_template == "🟠 ORANJE - Stimulans":
+            st.subheader("🟠 Stimulans - Oranje klanten")
+            st.markdown("Klanten die het oké doen maar met een kleine push groen kunnen worden.")
 
----
+            oranje_klanten = scores_df[scores_df['Kleur'] == 'ORANJE'][['Klant_Code', 'Klantnaam', 'Functionarissen', 'Views', 'Aantal_Groepen']].copy()
 
-{email_body}
-"""
-                    st.text_area("Email template", email_display, height=400)
+            if len(oranje_klanten) > 0:
+                st.dataframe(oranje_klanten, use_container_width=True, height=200)
 
-                    # Mailto link met body - URL encode de body
-                    import urllib.parse
-                    encoded_body = urllib.parse.quote(email_body)
-                    encoded_subject = urllib.parse.quote(email_subject)
+                selected_klanten = st.multiselect(
+                    "Selecteer klanten",
+                    options=oranje_klanten['Klantnaam'].tolist(),
+                    default=[],
+                    key="oranje_select"
+                )
 
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if to_line:
-                            mailto_url = f"mailto:{to_line}?subject={encoded_subject}&body={encoded_body}"
-                            st.markdown(f'''
-                            <a href="{mailto_url}" target="_blank" style="
-                                display: inline-block;
-                                padding: 10px 20px;
-                                background-color: #0066cc;
-                                color: white;
-                                text-decoration: none;
-                                border-radius: 5px;
-                                font-weight: bold;
-                            ">📧 Open in Outlook</a>
-                            ''', unsafe_allow_html=True)
-                        else:
-                            st.warning("Geen email adressen gevonden. Upload Pipedrive People data.")
+                if selected_klanten:
+                    to_emails = get_emails_for_klanten(selected_klanten)
 
-                    with col2:
-                        st.download_button(
-                            "📋 Download als tekstbestand",
-                            email_display,
-                            file_name=f"upsell_email_{email_cluster.replace(' ', '_')}.txt",
-                            mime="text/plain"
-                        )
+                    # Haal gemiddelde stats op voor geselecteerde klanten
+                    selected_data = oranje_klanten[oranje_klanten['Klantnaam'].isin(selected_klanten)]
+                    avg_func = int(selected_data['Functionarissen'].mean())
+                    avg_clusters = int(selected_data['Aantal_Groepen'].mean())
 
-        else:
-            st.info("Geen klanten gevonden met ontbrekende clusters op basis van de huidige filters.")
+                    subject = "Jullie doen het goed - maar er zit nog meer in!"
+                    body = f"""Hoi,
 
-        # Samenvatting cluster adoptie
+Goed om te zien dat jullie actief met de Power BI dashboards werken! Jullie hebben nu {avg_func} collega's die de rapporten bekijken.
+
+We zien nog wat kansen om nog meer uit de dashboards te halen:
+- Meer collega's toegang geven zodat iedereen met dezelfde cijfers werkt
+- Rapportclusters verkennen die jullie nog niet gebruiken (jullie gebruiken nu {avg_clusters} van de 13)
+- Een korte opfrissessie om nieuwe features te ontdekken
+
+Zin om even te sparren over hoe jullie nog meer waarde kunnen halen uit de dashboards?
+
+Groet,
+
+Het Notifica Team"""
+
+                    render_email(to_emails, subject, body, "oranje_stimulans")
+            else:
+                st.info("Geen oranje klanten gevonden.")
+
+        # === TEMPLATE 3: CLUSTER INTRODUCTIE ===
+        elif selected_template == "📊 Cluster Introductie":
+            st.subheader("📊 Cluster Introductie - Upsell")
+            st.markdown("Promoot een specifieke rapportcluster bij klanten die deze nog niet gebruiken.")
+
+            # Selecteer cluster
+            selected_cluster = st.selectbox(
+                "Welke rapportcluster wil je promoten?",
+                options=ALLE_RAPPORTCLUSTERS,
+                key="cluster_select"
+            )
+
+            # Vind klanten zonder dit cluster
+            klanten_zonder = []
+            for klant_code, clusters in klant_cluster_usage.items():
+                if selected_cluster not in clusters:
+                    klant_info = klantnamen[klantnamen['Klant_Code'] == klant_code]
+                    if len(klant_info) > 0:
+                        klanten_zonder.append({
+                            'Klant_Code': klant_code,
+                            'Klantnaam': klant_info['Klantnaam'].iloc[0],
+                            'Huidige clusters': len(clusters)
+                        })
+
+            if klanten_zonder:
+                zonder_df = pd.DataFrame(klanten_zonder)
+                st.markdown(f"**{len(zonder_df)} klanten** gebruiken '{selected_cluster}' nog niet:")
+                st.dataframe(zonder_df, use_container_width=True, height=200)
+
+                selected_klanten = st.multiselect(
+                    "Selecteer klanten",
+                    options=zonder_df['Klantnaam'].tolist(),
+                    default=[],
+                    key="cluster_klant_select"
+                )
+
+                if selected_klanten:
+                    to_emails = get_emails_for_klanten(selected_klanten)
+                    beschrijving = CLUSTER_BESCHRIJVINGEN.get(selected_cluster, 'waardevolle inzichten')
+
+                    subject = f"Nieuw voor jullie: {selected_cluster}"
+                    body = f"""Hoi,
+
+We zagen dat jullie nog geen gebruik maken van onze {selected_cluster} dashboards. Dat is zonde, want dit cluster biedt je {beschrijving}.
+
+Wat kun je ermee?
+- Direct inzicht zonder handmatige rapportages
+- Altijd actuele data vanuit je bronsysteem
+- Speciaal ontworpen voor jullie branche
+
+We laten het graag zien in een korte demo van 15-20 minuten. Dan kun je zelf bepalen of het wat voor jullie is.
+
+Interesse? Laat het weten, dan plannen we iets in.
+
+Groet,
+
+Het Notifica Team"""
+
+                    render_email(to_emails, subject, body, f"cluster_{selected_cluster}")
+            else:
+                st.success(f"Alle klanten gebruiken '{selected_cluster}' al!")
+
+        # === TEMPLATE 4: MEER GEBRUIKERS ===
+        elif selected_template == "👥 Meer gebruikers":
+            st.subheader("👥 Meer gebruikers - Adoptie verhogen")
+            st.markdown("Klanten met weinig actieve gebruikers uitnodigen om meer collega's toegang te geven.")
+
+            # Klanten met < 3 functionarissen
+            weinig_users = scores_df[scores_df['Functionarissen'] < 3][['Klant_Code', 'Klantnaam', 'Functionarissen', 'Views', 'Kleur']].copy()
+
+            if len(weinig_users) > 0:
+                st.markdown(f"**{len(weinig_users)} klanten** hebben minder dan 3 actieve gebruikers:")
+                st.dataframe(weinig_users, use_container_width=True, height=200)
+
+                selected_klanten = st.multiselect(
+                    "Selecteer klanten",
+                    options=weinig_users['Klantnaam'].tolist(),
+                    default=[],
+                    key="users_select"
+                )
+
+                if selected_klanten:
+                    to_emails = get_emails_for_klanten(selected_klanten)
+
+                    subject = "Tip: geef meer collega's toegang tot de dashboards"
+                    body = """Hoi,
+
+We zien dat jullie dashboards door een kleine groep collega's wordt bekeken. Dat werkt prima, maar we merken dat organisaties meer waarde halen als meer mensen met dezelfde cijfers werken.
+
+Denk bijvoorbeeld aan:
+- Projectleiders die hun eigen projecten kunnen volgen
+- MT-leden die het directierapport bekijken
+- Controllers die de financiële dashboards gebruiken
+
+Extra gebruikers toevoegen is zo geregeld. We kunnen jullie helpen met:
+- Bepalen wie welke dashboards nodig heeft
+- Toegang regelen via jullie IT
+- Een korte intro voor nieuwe gebruikers
+
+Zullen we even kijken wie er nog meer baat bij zou hebben?
+
+Groet,
+
+Het Notifica Team"""
+
+                    render_email(to_emails, subject, body, "meer_users")
+            else:
+                st.success("Alle klanten hebben 3 of meer actieve gebruikers!")
+
+        # === TEMPLATE 5: TRAINING AANBOD ===
+        elif selected_template == "🎓 Training aanbod":
+            st.subheader("🎓 Training aanbod - Activatie")
+            st.markdown("Klanten die veel clusters hebben maar relatief weinig views - ze hebben de tools maar gebruiken ze niet optimaal.")
+
+            # Klanten met >= 5 clusters maar < 30 views
+            training_kandidaten = scores_df[
+                (scores_df['Aantal_Groepen'] >= 5) &
+                (scores_df['Views'] < 30)
+            ][['Klant_Code', 'Klantnaam', 'Aantal_Groepen', 'Views', 'Functionarissen']].copy()
+
+            if len(training_kandidaten) > 0:
+                st.markdown(f"**{len(training_kandidaten)} klanten** hebben veel clusters (>=5) maar weinig views (<30):")
+                st.dataframe(training_kandidaten, use_container_width=True, height=200)
+
+                selected_klanten = st.multiselect(
+                    "Selecteer klanten",
+                    options=training_kandidaten['Klantnaam'].tolist(),
+                    default=[],
+                    key="training_select"
+                )
+
+                if selected_klanten:
+                    to_emails = get_emails_for_klanten(selected_klanten)
+
+                    subject = "Gratis opfrissessie voor jullie dashboards"
+                    body = """Hoi,
+
+Jullie hebben toegang tot een mooi pakket aan dashboards, maar we zien dat ze nog niet zo vaak bekeken worden als zou kunnen. Misschien is het even wennen, of zijn er vragen over hoe je bepaalde informatie vindt.
+
+Daarom bieden we een gratis opfrissessie aan:
+- 30 minuten, online of op locatie
+- We lopen de belangrijkste dashboards door
+- Ruimte voor vragen en tips op maat
+
+Geen verkooppraatje, gewoon zorgen dat jullie er meer uithalen. Want daar worden we allebei blij van.
+
+Interesse? Plan direct iets in of laat weten wanneer het uitkomt.
+
+Groet,
+
+Het Notifica Team"""
+
+                    render_email(to_emails, subject, body, "training")
+            else:
+                st.info("Geen klanten gevonden die voldoen aan de criteria (>=5 clusters, <30 views).")
+                st.markdown("**Tip:** Pas de criteria aan in de code als je andere drempels wilt gebruiken.")
+
+        # Cluster adoptie overzicht onderaan
+        st.markdown("---")
         st.subheader("📊 Cluster Adoptie Overzicht")
 
         adoptie_data = []
