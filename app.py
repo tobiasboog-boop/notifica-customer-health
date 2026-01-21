@@ -1581,12 +1581,18 @@ Het Notifica Team"""
                 st.markdown("---")
 
                 # Filter op aantal ontbrekende clusters
-                ontbrekend_filter = st.multiselect(
+                filter_opties = {
+                    "3 - Alle basis clusters ontbreken": [3],
+                    "2 of meer ontbrekend": [2, 3],
+                    "1 of meer ontbrekend": [1, 2, 3]
+                }
+                gekozen_filter = st.selectbox(
                     "Filter op aantal ontbrekende basis clusters",
-                    options=[1, 2, 3],
-                    default=[2, 3],
+                    options=list(filter_opties.keys()),
+                    index=0,  # Standaard: alle 3 ontbreken
                     key="basis_filter"
                 )
+                ontbrekend_filter = filter_opties[gekozen_filter]
 
                 gefilterde_basis = basis_df[basis_df['Aantal ontbrekend'].isin(ontbrekend_filter)]
 
