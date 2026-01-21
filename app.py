@@ -1618,7 +1618,7 @@ Het Notifica Team"""
                         # Intro sectie
                         body = """Hoi,
 
-Ik ben Domiin Parren, nieuwe medewerker bij Notifica. Ik ben momenteel bezig om al onze klanten beter te leren kennen - wie jullie zijn, hoe jullie Notifica gebruiken, en waar we nog kunnen helpen.
+Ik ben Domien Parren, nieuwe medewerker bij Notifica. Ik ben momenteel bezig om al onze klanten beter te leren kennen - wie jullie zijn, hoe jullie Notifica gebruiken, en waar we nog kunnen helpen.
 
 """
                         # Conditionele sectie op basis van wat ontbreekt
@@ -1667,7 +1667,7 @@ Heb je vragen of wil je even sparren? Stuur me gerust een berichtje terug - ik l
 
 Groet,
 
-Domiin Parren
+Domien Parren
 Notifica"""
 
                         with st.expander(f"📧 Email voor {klantnaam} ({len(ontbrekend_list)} ontbrekend)", expanded=True):
