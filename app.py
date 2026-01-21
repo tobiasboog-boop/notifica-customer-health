@@ -1762,7 +1762,8 @@ Samen geven deze dashboards je een compleet beeld van je bedrijfsvoering.
 
                         body += """Ik maak graag vrijblijvend kennis en geef jullie een kosteloze APK op jullie dashboards.
 
-**[Plan hier direct een afspraak](https://outlook.office365.com/book/domien.parren@notifica.nl)**
+Plan hier direct een afspraak:
+https://outlook.office365.com/book/domien.parren@notifica.nl
 
 Kies een moment dat jullie uitkomt - er wordt automatisch een Teams-link aangemaakt.
 
