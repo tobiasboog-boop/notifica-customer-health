@@ -292,9 +292,16 @@ def get_contacts_for_customer(contacts_df, klantnaam):
     if contacts_df is None or contacts_df.empty:
         return pd.DataFrame()
 
+    # Guard tegen None of lege klantnaam
+    if not klantnaam or not isinstance(klantnaam, str) or not klantnaam.strip():
+        return pd.DataFrame()
+
+    klantnaam = str(klantnaam).strip()
+    search_term = klantnaam.split()[0] if klantnaam.split() else klantnaam
+
     matches = contacts_df[
-        contacts_df['Organisatie'].str.contains(klantnaam.split()[0], case=False, na=False) |
-        contacts_df['Org_Naam'].str.contains(klantnaam.split()[0], case=False, na=False)
+        contacts_df['Organisatie'].str.contains(search_term, case=False, na=False) |
+        contacts_df['Org_Naam'].str.contains(search_term, case=False, na=False)
     ]
 
     if matches.empty and len(klantnaam) > 3:
