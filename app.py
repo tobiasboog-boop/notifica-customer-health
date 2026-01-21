@@ -1722,45 +1722,28 @@ Het Notifica Team"""
 
 Ik ben Domien Parren, nieuwe medewerker bij Notifica. Ik ben momenteel bezig om al onze klanten beter te leren kennen - wie jullie zijn, hoe jullie Notifica gebruiken, en waar we nog kunnen helpen.
 
+Bij Notifica hebben we het vaak over 'de basis op orde' - drie dashboards die samen de kern vormen van goed sturen op cijfers:
+
+1. Financieel Overzicht - Direct inzicht in je financiële positie
+2. Bewaking productiviteit - Grip op uren en productiviteit per medewerker
+3. Projectwaardering - Nauwkeurige waardering van je projecten
+
 """
                         # Conditionele sectie op basis van wat ontbreekt
                         if len(ontbrekend_list) == 3:
-                            body += """Toen ik in jullie account keek, viel me op dat jullie de drie basis dashboards nog niet gebruiken. Dat vind ik jammer, want juist deze drie vormen samen wat wij 'de basis op orde' noemen - de kern van goed sturen op cijfers:
+                            body += """Uit onze gegevens lijkt het erop dat jullie deze dashboards nog niet actief gebruiken - maar het kan natuurlijk zijn dat dit niet helemaal klopt. Hoe dan ook, ik vind het een mooi moment om kennis te maken en samen te kijken wat jullie wél gebruiken en waar nog kansen liggen.
 
 """
                         elif len(ontbrekend_list) == 2:
-                            body += f"""Toen ik in jullie account keek, zag ik dat jullie al met sommige dashboards werken - goed bezig! Maar ik merkte ook dat twee belangrijke rapporten nog niet worden gebruikt. Bij Notifica noemen we drie dashboards samen 'de basis op orde' - de kern van goed sturen op cijfers. Jullie missen nog:
+                            body += """Uit onze gegevens lijkt het erop dat jullie nog niet alle drie deze dashboards actief gebruiken - maar het kan natuurlijk zijn dat dit niet helemaal klopt. Hoe dan ook, ik vind het een mooi moment om kennis te maken en samen te kijken hoe jullie Notifica inzetten.
 
 """
                         else:  # 1 ontbrekend
-                            body += f"""Toen ik in jullie account keek, zag ik dat jullie al goed op weg zijn met de dashboards - mooi! Er is nog één rapport dat jullie nog niet gebruiken, en dat zou ik graag onder jullie aandacht brengen:
+                            body += """Uit onze gegevens lijkt het erop dat jullie al twee van deze drie dashboards gebruiken - goed bezig! Ik ben benieuwd of dat klopt en of er nog iets is waar we bij kunnen helpen.
 
 """
 
-                        # Voeg alleen de ontbrekende rapporten toe met uitleg
-                        rapport_uitleg = {
-                            'Financieel Overzicht': '**Financieel Overzicht** - Direct inzicht in je financiële positie. Zie in één oogopslag hoe je ervoor staat.',
-                            'Bewaking productiviteit': '**Bewaking productiviteit** - Grip op uren en productiviteit per medewerker. Essentieel voor het bewaken van je marges.',
-                            'Projectwaardering': '**Projectwaardering** - Nauwkeurige waardering van je projecten. Weet precies wat je onderhanden werk waard is.'
-                        }
-
-                        for i, rapport in enumerate(ontbrekend_list, 1):
-                            if rapport in rapport_uitleg:
-                                body += f"{i}. {rapport_uitleg[rapport]}\n"
-
-                        # Afsluiting
-                        if len(ontbrekend_list) == 1:
-                            body += """
-Dit dashboard complementeert wat jullie al gebruiken en geeft je een completer beeld.
-
-"""
-                        else:
-                            body += """
-Samen geven deze dashboards je een compleet beeld van je bedrijfsvoering.
-
-"""
-
-                        body += """Ik maak graag vrijblijvend kennis en geef jullie een kosteloze APK op jullie dashboards. Plan gerust direct een afspraak via de knop onderaan deze email - kies een moment dat jullie uitkomt en er wordt automatisch een Teams-uitnodiging aangemaakt.
+                        body += """Ik maak graag vrijblijvend kennis en loop samen met jullie door de mogelijkheden. Geen verkooppraatje, gewoon even kijken of alles goed staat en of er nog tips zijn. Plan gerust een afspraak via de knop onderaan deze email.
 
 Ik hoor graag van jullie!
 
