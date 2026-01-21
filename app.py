@@ -205,6 +205,25 @@ def categorize_report(name):
     return 'Niet geclassificeerd'
 
 
+def normalize_org_columns(orgs_df):
+    """Normaliseer kolomnamen voor organizations export (ondersteunt oude en nieuwe Pipedrive formaten)"""
+    df = orgs_df.copy()
+
+    # Mapping van oude naar nieuwe kolomnamen
+    column_mapping = {
+        'Organisatie - Klantnummer': 'Klantnummer',
+        'Organisatie - Naam': 'Naam',
+        'Organisatie - ID': 'ID',
+    }
+
+    # Hernoem kolommen als ze de oude prefix hebben
+    for old_name, new_name in column_mapping.items():
+        if old_name in df.columns:
+            df = df.rename(columns={old_name: new_name})
+
+    return df
+
+
 def get_report_categorization(df):
     """Genereer een overzicht van alle rapporten en hun categorisatie"""
     reports = df['Report name'].dropna().unique()
@@ -239,8 +258,9 @@ def process_contacts(contacts_df, orgs_df):
     contacts['Email'] = contacts['E-mail - Werk'].fillna(contacts['E-mail - Privé']).fillna(contacts['E-mail - Anders'])
     contacts['Email'] = contacts['Email'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else None)
 
-    # Koppel aan organisatie klantnummer
-    orgs = orgs_df[['Organisatie - Klantnummer', 'Organisatie - Naam']].copy()
+    # Koppel aan organisatie klantnummer (ondersteun oude en nieuwe Pipedrive formats)
+    orgs_normalized = normalize_org_columns(orgs_df)
+    orgs = orgs_normalized[['Klantnummer', 'Naam']].copy()
     orgs.columns = ['Klant_Code', 'Org_Naam']
     orgs['Klant_Code'] = orgs['Klant_Code'].astype(str)
 
@@ -563,7 +583,8 @@ def main():
     pbi_df['Klant_Code'] = pbi_df['Workspace name'].str.extract(r'^(\d{4})')
     pbi_df = pbi_df[pbi_df['Klant_Code'].notna()].copy()
 
-    klantnamen = orgs_df[['Organisatie - Klantnummer', 'Organisatie - Naam']].copy()
+    orgs_normalized = normalize_org_columns(orgs_df)
+    klantnamen = orgs_normalized[['Klantnummer', 'Naam']].copy()
     klantnamen.columns = ['Klant_Code', 'Klantnaam']
     klantnamen['Klant_Code'] = klantnamen['Klant_Code'].astype(str)
 
