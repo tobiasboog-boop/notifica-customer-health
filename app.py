@@ -252,10 +252,29 @@ def get_report_categorization(df):
 def process_contacts(contacts_df, orgs_df):
     """Verwerk contactpersonen en koppel aan organisaties"""
     contacts = contacts_df.copy()
+    # Verwijder prefix indien aanwezig (ondersteunt oude en nieuwe Pipedrive formats)
     contacts.columns = [c.replace('Contactpersoon - ', '') for c in contacts.columns]
 
+    # Zoek email kolommen flexibel (ondersteunt encoding variaties)
+    def find_column(df, patterns):
+        for col in df.columns:
+            for pattern in patterns:
+                if pattern.lower() in col.lower():
+                    return col
+        return None
+
+    email_werk_col = find_column(contacts, ['E-mail - Werk', 'Email - Werk'])
+    email_prive_col = find_column(contacts, ['E-mail - Priv', 'Email - Priv'])
+    email_anders_col = find_column(contacts, ['E-mail - Anders', 'Email - Anders'])
+
     # Combineer email velden
-    contacts['Email'] = contacts['E-mail - Werk'].fillna(contacts['E-mail - Privé']).fillna(contacts['E-mail - Anders'])
+    contacts['Email'] = None
+    if email_werk_col:
+        contacts['Email'] = contacts[email_werk_col]
+    if email_prive_col:
+        contacts['Email'] = contacts['Email'].fillna(contacts[email_prive_col])
+    if email_anders_col:
+        contacts['Email'] = contacts['Email'].fillna(contacts[email_anders_col])
     contacts['Email'] = contacts['Email'].apply(lambda x: str(x).split(',')[0].strip() if pd.notna(x) else None)
 
     # Koppel aan organisatie klantnummer (ondersteun oude en nieuwe Pipedrive formats)
