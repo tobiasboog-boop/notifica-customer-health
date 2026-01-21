@@ -10,10 +10,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import BytesIO
 import os
 import json
+import random
 from dotenv import load_dotenv
 
 # Laad .env bestand
@@ -1658,12 +1659,31 @@ Samen geven deze dashboards je een compleet beeld van je bedrijfsvoering.
 
 """
 
-                        body += """Ik help jullie graag op weg:
-- **Gratis webinar** waarin we de basis doorlopen: [LINK NAAR WEBINAR]
-- **Zelf verkennen** met onze analysetool: [LINK NAAR TOOL]
-- **Persoonlijke APK** waarbij we samen door jullie cijfers lopen: [LINK NAAR APK AANVRAAG]
+                        # Genereer 3 random data in februari 2025 (werkdagen)
+                        februari_werkdagen = []
+                        datum = datetime(2025, 2, 3)  # Start op maandag 3 feb
+                        while datum.month == 2:
+                            if datum.weekday() < 5:  # Maandag t/m vrijdag
+                                februari_werkdagen.append(datum)
+                            datum += timedelta(days=1)
 
-Heb je vragen of wil je even sparren? Stuur me gerust een berichtje terug - ik leer graag wat jullie bezighoudt!
+                        # Kies 3 random werkdagen
+                        gekozen_data = sorted(random.sample(februari_werkdagen, 3))
+                        dag_namen = ['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag']
+
+                        data_opties = []
+                        for d in gekozen_data:
+                            dag_naam = dag_namen[d.weekday()]
+                            data_opties.append(f"{dag_naam} {d.day} februari")
+
+                        body += f"""Ik maak graag vrijblijvend kennis en geef jullie een kosteloze APK op jullie dashboards. Reageer op deze email met een datum die jullie past:
+
+- [ ] {data_opties[0]}
+- [ ] {data_opties[1]}
+- [ ] {data_opties[2]}
+- [ ] Geen van bovenstaande, maar neem contact op voor een ander moment
+
+Ik hoor graag van jullie!
 
 Groet,
 
