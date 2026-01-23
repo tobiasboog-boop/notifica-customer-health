@@ -82,6 +82,36 @@ def save_file_to_github(file_content, filename, commit_message):
     else:
         return False, f"Fout bij opslaan: {response.json().get('message', 'Onbekende fout')}"
 
+
+def load_file_from_github(filename):
+    """Laad een bestand uit de GitHub repository (data/ folder)"""
+    token = get_github_token()
+
+    # GitHub API endpoint
+    api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/data/{filename}"
+
+    headers = {
+        "Accept": "application/vnd.github.v3+json"
+    }
+    if token:
+        headers["Authorization"] = f"token {token}"
+
+    response = requests.get(api_url, headers=headers)
+
+    if response.status_code == 200:
+        content_b64 = response.json().get("content", "")
+        content = base64.b64decode(content_b64)
+        return BytesIO(content)
+    else:
+        return None
+
+
+@st.cache_data(ttl=60)  # Cache for 60 seconds, then refresh
+def load_github_data(filename):
+    """Cached wrapper voor GitHub data loading"""
+    return load_file_from_github(filename)
+
+
 # Page config
 st.set_page_config(
     page_title="Notifica Customer Health",
@@ -546,23 +576,17 @@ def main():
         default_orgs_exists = os.path.exists(DEFAULT_ORGS_FILE)
         default_people_exists = os.path.exists(DEFAULT_PEOPLE_FILE)
 
-        if default_pbi_exists and default_orgs_exists:
-            st.warning("⚠️ **Let op:** Standaard data geladen. Controleer of dit de laatste versies zijn!")
+        # Check of data beschikbaar is uit GitHub
+        github_data_available = load_file_from_github("powerbi_activity.xlsx") is not None
 
-            # Toon welke bestanden geladen zijn
-            with st.expander("📂 Geladen bestanden"):
-                if default_pbi_exists:
-                    mod_time = datetime.fromtimestamp(os.path.getmtime(DEFAULT_PBI_FILE))
-                    st.markdown(f"**Power BI:** `powerbi_activity.xlsx`\n\n*Laatste update: {mod_time.strftime('%d-%m-%Y %H:%M')}*")
-                if default_orgs_exists:
-                    mod_time = datetime.fromtimestamp(os.path.getmtime(DEFAULT_ORGS_FILE))
-                    st.markdown(f"**Organizations:** `organizations.xlsx`\n\n*Laatste update: {mod_time.strftime('%d-%m-%Y %H:%M')}*")
-                if default_people_exists:
-                    mod_time = datetime.fromtimestamp(os.path.getmtime(DEFAULT_PEOPLE_FILE))
-                    st.markdown(f"**People:** `people.xlsx`\n\n*Laatste update: {mod_time.strftime('%d-%m-%Y %H:%M')}*")
+        if github_data_available or (default_pbi_exists and default_orgs_exists):
+            if github_data_available:
+                st.success("☁️ **Data geladen uit GitHub** (altijd de laatste versie)")
+            else:
+                st.warning("⚠️ **Let op:** Lokale data geladen. Upload nieuwe versie voor actuele data.")
 
             st.markdown("---")
-            st.markdown("**Nieuwe versies uploaden (optioneel):**")
+            st.markdown("**Nieuwe versies uploaden (vervangt de oude data volledig):**")
 
         pbi_file = st.file_uploader(
             "Power BI Activity Export (.xlsx)",
@@ -619,8 +643,13 @@ def main():
                             all_success = False
 
                     if all_success:
+                        # Clear cache zodat nieuwe data direct geladen wordt
+                        load_github_data.clear()
                         st.balloons()
-                        st.info("🔄 De app herlaadt automatisch binnen enkele minuten met de nieuwe data. Je kunt ook handmatig refreshen.")
+                        st.success("✅ Data opgeslagen en cache geleegd! De app herlaadt automatisch...")
+                        import time
+                        time.sleep(1)
+                        st.rerun()
 
         st.markdown("---")
         st.header("⚙️ Instellingen")
@@ -664,10 +693,17 @@ def main():
 
         st.caption("💡 Verwachte verdeling: ~70% groen, ~25% oranje, ~5% rood")
 
-    # Bepaal welke bestanden te gebruiken (uploaded > default)
-    use_pbi = pbi_file if pbi_file else (DEFAULT_PBI_FILE if default_pbi_exists else None)
-    use_orgs = pipedrive_orgs_file if pipedrive_orgs_file else (DEFAULT_ORGS_FILE if default_orgs_exists else None)
-    use_people = pipedrive_people_file if pipedrive_people_file else (DEFAULT_PEOPLE_FILE if default_people_exists else None)
+    # Bepaal welke bestanden te gebruiken (uploaded > GitHub > lokaal)
+    # Prioriteit: 1) Nieuwe upload, 2) GitHub (altijd actueel), 3) Lokale fallback
+
+    # Probeer eerst GitHub als bron (dit is altijd de meest actuele versie)
+    github_pbi = load_github_data("powerbi_activity.xlsx")
+    github_orgs = load_github_data("organizations.xlsx")
+    github_people = load_github_data("people.xlsx")
+
+    use_pbi = pbi_file if pbi_file else (github_pbi if github_pbi else (DEFAULT_PBI_FILE if default_pbi_exists else None))
+    use_orgs = pipedrive_orgs_file if pipedrive_orgs_file else (github_orgs if github_orgs else (DEFAULT_ORGS_FILE if default_orgs_exists else None))
+    use_people = pipedrive_people_file if pipedrive_people_file else (github_people if github_people else (DEFAULT_PEOPLE_FILE if default_people_exists else None))
 
     # Check if files are available
     if use_pbi is None or use_orgs is None:
